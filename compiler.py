@@ -25,6 +25,17 @@ class cplusplus_error(Exception):
     def __str__(self):
         return self.desc
 
+# Each "build_" compiler method takes a list of source files. Before invoking
+# the compiler, each source file is checked against it's coresponding object
+# file to determine if it needs to be rebuilt. A "rebuild_record" records all of
+# the details; the source file, the object file the compiler would build, and
+# the .dep file, which is a list of the header files the source file depends on.
+class rebuild_record:
+    def __init__(self, source, obj, dep):
+        self.source = source
+        self.obj = obj
+        self.dep = dep
+
 # Each compiler object should expose the following methods publicly:
 # "host" = the name of the platform the tool runs on (Windows/Linux)
 # "target_family" = the name of the platform the tool targets (windows/posix)
@@ -44,10 +55,6 @@ class cplusplus_error(Exception):
 # "link_module" = Link object code in to a shared library or application.
 
 class compiler:
-    rebuild_record_source_index = 0
-    rebuild_record_obj_index = 1
-    rebuild_record_dep_index = 2
-
     invoke_tuple_return_index = 0
     invoke_tuple_stdout_index = 1
 
@@ -123,6 +130,9 @@ class compiler:
                     if not os.path.exists(source_dep):
                         rebuild = True
                     else:
+                        # Dep file: At this point, we know the source file exists, but is
+                        # not out of date, and the dep file exists from a previous compile;
+                        # it's still valid though, as the source file is not out of date.
                         with open(source_dep, 'r') as deps_file:
                             deps_list = []
                             deps_text = deps_file.read()
@@ -133,8 +143,7 @@ class compiler:
                                     break
 
             if rebuild:
-                source_desc = (source, source_obj, source_dep)
-                rebuild_list.append(source_desc)
+                rebuild_list.append(rebuild_record(source, source_obj, source_dep))
 
         # Run the compiler.
         if len(rebuild_list) > 0:
