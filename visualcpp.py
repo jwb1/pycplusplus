@@ -16,7 +16,7 @@
 import os
 import copy
 import re
-from .cplusplus import compiler
+from .compiler import compiler
 
 class visual_cpp(compiler):
     split_includes_text_index = 0
@@ -195,8 +195,8 @@ class visual_cpp(compiler):
 
         did_pch = False
         did_rc = False
-        for rebuild_record in rebuild_list:
-            source_split = os.path.split(rebuild_record[compiler.rebuild_record_source_index])
+        for r in rebuild_list:
+            source_split = os.path.split(r.source)
             source_name_split = os.path.splitext(source_split[1])
             source_base_name = source_name_split[0]
             source_extension = source_name_split[1]
@@ -208,7 +208,7 @@ class visual_cpp(compiler):
                 # Super-naive C++ parsing; assume the precompiled header source file includes
                 # ONE file only.
                 precomp_match = None
-                with open(rebuild_record[compiler.rebuild_record_source_index], 'r') as precomp_file:
+                with open(r.source, 'r') as precomp_file:
                     precomp_text = precomp_file.read()
                     precomp_match = re.search(r'#include\s*[<"](.*)[>"]', precomp_text)
 
@@ -221,8 +221,8 @@ class visual_cpp(compiler):
                 invocation_flags = copy.copy(compile_flags)
                 invocation_flags.extend(['/Yc"' + precompiled_header + '"',
                                          '/Fp"' + precompiled_binary + '"',
-                                         '/Fo"' + rebuild_record[compiler.rebuild_record_obj_index] + '"',
-                                         '"' + rebuild_record[compiler.rebuild_record_source_index] + '"'])
+                                         '/Fo"' + r.obj + '"',
+                                         '"' + r.source + '"'])
 
                 compile_flags.extend(['/Yu"' + precompiled_header + '"',
                                       '/Fp"' + precompiled_binary + '"'])
@@ -230,10 +230,10 @@ class visual_cpp(compiler):
                 # Run it
                 self.print_both("building precompiled header")
                 invoke_tuple = self.invoke(invocation_flags)
-                self.handle_compiler_invoke_tuple(invoke_tuple, rebuild_record[compiler.rebuild_record_dep_index])
+                self.handle_compiler_invoke_tuple(invoke_tuple, r.dep)
 
                 # Do not compile the precompiled header source file again
-                rebuild_list.remove(rebuild_record)
+                rebuild_list.remove(r)
                 did_pch = True
             elif source_extension.lower() == '.rc':
                 if did_rc:
@@ -241,8 +241,8 @@ class visual_cpp(compiler):
                     self.handle_error("error: found multiple resource source files")
 
                 invocation_flags = copy.copy(rc_flags)
-                invocation_flags.extend(['/Fo"' + rebuild_record[compiler.rebuild_record_obj_index] + '"',
-                                         '"' + rebuild_record[compiler.rebuild_record_source_index] + '"'])
+                invocation_flags.extend(['/Fo"' + r.obj + '"',
+                                         '"' + r.source + '"'])
 
                 # Run it
                 self.print_both("resource compile %s" % source_split[1])
@@ -250,19 +250,19 @@ class visual_cpp(compiler):
                 if invoke_tuple[compiler.invoke_tuple_return_index] != 0:
                     self.handle_error(invoke_tuple[compiler.invoke_tuple_stdout_index])
 
-                rebuild_list.remove(rebuild_record)
+                rebuild_list.remove(r)
                 did_rc = True
 
-        for rebuild_record in rebuild_list:
+        for r in rebuild_list:
             # Finish the flags for this particular compiler invocation
             invocation_flags = copy.copy(compile_flags)
-            invocation_flags.extend(['/Fo"' + rebuild_record[compiler.rebuild_record_obj_index] + '"',
-                                     '"' + rebuild_record[compiler.rebuild_record_source_index] + '"'])
+            invocation_flags.extend(['/Fo"' + r.obj + '"',
+                                     '"' + r.source + '"'])
 
             # Run it
-            self.print_both("compiling %s" % os.path.basename(rebuild_record[compiler.rebuild_record_source_index]))
+            self.print_both("compiling %s" % os.path.basename(r.source))
             invoke_tuple = self.invoke(invocation_flags)
-            self.handle_compiler_invoke_tuple(invoke_tuple, rebuild_record[compiler.rebuild_record_dep_index])
+            self.handle_compiler_invoke_tuple(invoke_tuple, r.dep)
 
     def handle_compiler_invoke_tuple(self, invoke_tuple, deps_file_name):
         # Visual C++ interleaves the header list we use for deps files into the normal output
