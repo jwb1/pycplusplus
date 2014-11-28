@@ -41,7 +41,7 @@ class gcc(compiler):
             compile_flags.append('-I' + self.prep_path(include_dir))
 
         did_pch = False
-        for rebuild_record in rebuild_list:
+        for r in rebuild_list:
             source_split = os.path.split(r.source)
             source_name_split = os.path.splitext(source_split[1])
             source_base_name = source_name_split[0]
@@ -85,9 +85,9 @@ class gcc(compiler):
 
                 # Run it
                 self.print_both("building precompiled header")
-                invoke_tuple = self.invoke(invocation_flags)
-                if invoke_tuple[compiler.invoke_tuple_return_index] != 0:
-                    self.handle_error(invoke_tuple[compiler.invoke_tuple_stdout_index])
+                with self.invoke(invocation_flags) as i:
+                    if i.return_val != 0:
+                        self.handle_error(i.stdout)
 
                 self.process_dep_file(r.dep)
 
@@ -120,9 +120,9 @@ class gcc(compiler):
 
             # Run it
             self.print_both("compiling %s" % source_split[1])
-            invoke_tuple = self.invoke(invocation_flags)
-            if invoke_tuple[compiler.invoke_tuple_return_index] != 0:
-                self.handle_error(invoke_tuple[compiler.invoke_tuple_stdout_index])
+            with self.invoke(invocation_flags) as i:
+                if i.return_val != 0:
+                    self.handle_error(i.stdout)
 
             self.process_dep_file(r.dep)
 
@@ -187,9 +187,9 @@ class gcc(compiler):
                     ar_flags.append(self.prep_path(full_path))
 
         self.print_both("linking %s" % lib_name)
-        invoke_tuple = self.invoke(ar_flags)
-        if invoke_tuple[compiler.invoke_tuple_return_index] != 0:
-            self.handle_error(invoke_tuple[compiler.invoke_tuple_stdout_index])
+        with self.invoke(ar_flags) as i:
+            if i.return_val != 0:
+                self.handle_error(i.stdout)
 
     def link_module(self, name, output_dir, config, built_code, link_module_type, libpath_list, lib_list):
         link_name = self.get_link_name(name, link_module_type)
@@ -222,9 +222,9 @@ class gcc(compiler):
             ld_flags.append('-l' + lib)
 
         self.print_both("linking %s" % link_name)
-        invoke_tuple = self.invoke(ld_flags)
-        if invoke_tuple[compiler.invoke_tuple_return_index] != 0:
-            self.handle_error(invoke_tuple[compiler.invoke_tuple_stdout_index])
+        with self.invoke(ld_flags) as i:
+            if i.return_val != 0:
+                self.handle_error(i.stdout)
 
         # Now, generate a stripped version
         link_path_split = os.path.split(link_path)
@@ -238,7 +238,9 @@ class gcc(compiler):
                        '-o' + self.prep_path(stripped_path),
                        self.prep_path(link_path)
                       ]
-        self.invoke(strip_flags)
+        with self.invoke(strip_flags) as i:
+            if i.return_val != 0:
+                self.handle_error(i.stdout)
 
     def get_lib_name(self, name):
         return 'lib' + name + '.a'
@@ -303,8 +305,8 @@ class mingw_x86(gcc):
             windres_flags.append('-I"' + include_dir + '"')
 
         did_rc = False
-        for rebuild_record in rebuild_list:
-            source_split = os.path.split(rebuild_record[compiler.rebuild_record_source_index])
+        for r in rebuild_list:
+            source_split = os.path.split(r.source)
             source_name_split = os.path.splitext(source_split[1])
             source_base_name = source_name_split[0]
             source_extension = source_name_split[1]
@@ -314,16 +316,16 @@ class mingw_x86(gcc):
                     self.handle_error("error: found multiple resource source files")
 
                 invocation_flags = copy.copy(windres_flags)
-                invocation_flags.extend(['-o "' + rebuild_record[compiler.rebuild_record_obj_index] + '"',
-                                         '-i "' + rebuild_record[compiler.rebuild_record_source_index] + '"'])
+                invocation_flags.extend(['-o "' + r.obj + '"',
+                                         '-i "' + r.source + '"'])
 
                 # Run it
                 self.print_both("resource compile %s" % source_split[1])
-                invoke_tuple = self.invoke(invocation_flags)
-                if invoke_tuple[compiler.invoke_tuple_return_index] != 0:
-                    self.handle_error(invoke_tuple[compiler.invoke_tuple_stdout_index])
+                with self.invoke(invocation_flags) as i:
+                    if i.return_val != 0:
+                        self.handle_error(i.stdout)
 
-                rebuild_list.remove(rebuild_record)
+                rebuild_list.remove(r)
                 did_rc = True
 
         gcc.compile(self, name, config, output_dir, rebuild_list, include_list, define_list)

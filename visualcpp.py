@@ -229,8 +229,8 @@ class visual_cpp(compiler):
 
                 # Run it
                 self.print_both("building precompiled header")
-                invoke_tuple = self.invoke(invocation_flags)
-                self.handle_compiler_invoke_tuple(invoke_tuple, r.dep)
+                with self.invoke(invocation_flags) as i:
+                    self.handle_compiler_invoke_result(i, r.dep)
 
                 # Do not compile the precompiled header source file again
                 rebuild_list.remove(r)
@@ -246,9 +246,9 @@ class visual_cpp(compiler):
 
                 # Run it
                 self.print_both("resource compile %s" % source_split[1])
-                invoke_tuple = self.invoke(invocation_flags)
-                if invoke_tuple[compiler.invoke_tuple_return_index] != 0:
-                    self.handle_error(invoke_tuple[compiler.invoke_tuple_stdout_index])
+                with self.invoke(invocation_flags) as i:
+                    if i.return_val != 0:
+                        self.handle_error(i.stdout)
 
                 rebuild_list.remove(r)
                 did_rc = True
@@ -261,14 +261,14 @@ class visual_cpp(compiler):
 
             # Run it
             self.print_both("compiling %s" % os.path.basename(r.source))
-            invoke_tuple = self.invoke(invocation_flags)
-            self.handle_compiler_invoke_tuple(invoke_tuple, r.dep)
+            with self.invoke(invocation_flags) as i:
+                self.handle_compiler_invoke_result(i, r.dep)
 
-    def handle_compiler_invoke_tuple(self, invoke_tuple, deps_file_name):
+    def handle_compiler_invoke_result(self, i, deps_file_name):
         # Visual C++ interleaves the header list we use for deps files into the normal output
-        stdout_split = self.split_cl_output(invoke_tuple[compiler.invoke_tuple_stdout_index])
+        stdout_split = self.split_cl_output(i.stdout)
 
-        if invoke_tuple[compiler.invoke_tuple_return_index] != 0:
+        if i.return_val != 0:
             self.handle_error(stdout_split[visual_cpp.split_includes_text_index])
 
         # Write the dependent information into the .dep file
@@ -311,9 +311,9 @@ class visual_cpp(compiler):
         lib_flags.append('/OUT:"' + lib_path + '"')
 
         self.print_both("linking %s" % lib_name)
-        invoke_tuple = self.invoke(lib_flags)
-        if invoke_tuple[compiler.invoke_tuple_return_index] != 0:
-            self.handle_error(invoke_tuple[compiler.invoke_tuple_stdout_index])
+        with self.3(lib_flags) as i:
+            if i.return_val != 0:
+                self.handle_error(i.stdout)
 
     def link_module(self, name, output_dir, config, built_code, link_module_type, libpath_list, lib_list):
         link_name = self.get_link_name(name, link_module_type)
@@ -364,9 +364,9 @@ class visual_cpp(compiler):
             link_flags.extend(['libcpmt.lib', 'libcmt.lib'])
 
         self.print_both("linking %s" % link_name)
-        invoke_tuple = self.invoke(link_flags)
-        if invoke_tuple[compiler.invoke_tuple_return_index] != 0:
-            self.handle_error(invoke_tuple[compiler.invoke_tuple_stdout_index])
+        with self.invoke(link_flags) as i:
+            if i.return_val != 0:
+                self.handle_error(i.stdout)
 
     def get_lib_name(self, name):
         return name + '.lib'

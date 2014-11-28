@@ -25,6 +25,14 @@ class cplusplus_error(Exception):
     def __str__(self):
         return self.desc
 
+# Each time a command line tool is invoked, an instance of this is returned with
+# the process return code and stdout output captured.
+class invoke_result:
+    def __init__(self, return_val, stdout, stderr):
+        self.return_val = return_val
+        self.stdout = stdout
+        self.stderr = stderr
+
 # Each "build_" compiler method takes a list of source files. Before invoking
 # the compiler, each source file is checked against it's coresponding object
 # file to determine if it needs to be rebuilt. A "rebuild_record" records all of
@@ -55,9 +63,6 @@ class rebuild_record:
 # "link_module" = Link object code in to a shared library or application.
 
 class compiler:
-    invoke_tuple_return_index = 0
-    invoke_tuple_stdout_index = 1
-
     object_details_extension_index = 0
     object_details_need_deps = 1
 
@@ -91,7 +96,7 @@ class compiler:
             universal_newlines=True
             )
         console_out = proc.communicate()
-        return (proc.returncode, console_out[0]) # 0 = index of stdout buffer in tuple
+        return (invoke_result(proc.returncode, console_out[0], console_out[1]))
 
     def build_object_code(self, name, output_dir, config, source_list, include_list, define_list):
         object_code_dir = os.path.join(output_dir, name + '.intermediates', 'obj')
