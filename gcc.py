@@ -85,9 +85,9 @@ class gcc(compiler):
 
                 # Run it
                 self.print_both("building precompiled header")
-                with self.invoke(invocation_flags) as i:
-                    if i.return_val != 0:
-                        self.handle_error(i.stdout)
+                i = self.invoke(invocation_flags)
+                if i.return_val != 0:
+                    self.handle_error(i.stdout)
 
                 self.process_dep_file(r.dep)
 
@@ -120,9 +120,9 @@ class gcc(compiler):
 
             # Run it
             self.print_both("compiling %s" % source_split[1])
-            with self.invoke(invocation_flags) as i:
-                if i.return_val != 0:
-                    self.handle_error(i.stdout)
+            i = self.invoke(invocation_flags)
+            if i.return_val != 0:
+                self.handle_error(i.stdout)
 
             self.process_dep_file(r.dep)
 
@@ -187,9 +187,9 @@ class gcc(compiler):
                     ar_flags.append(self.prep_path(full_path))
 
         self.print_both("linking %s" % lib_name)
-        with self.invoke(ar_flags) as i:
-            if i.return_val != 0:
-                self.handle_error(i.stdout)
+        i = self.invoke(ar_flags)
+        if i.return_val != 0:
+            self.handle_error(i.stdout)
 
     def link_module(self, name, output_dir, config, built_code, link_module_type, libpath_list, lib_list):
         link_name = self.get_link_name(name, link_module_type)
@@ -222,9 +222,9 @@ class gcc(compiler):
             ld_flags.append('-l' + lib)
 
         self.print_both("linking %s" % link_name)
-        with self.invoke(ld_flags) as i:
-            if i.return_val != 0:
-                self.handle_error(i.stdout)
+        i = self.invoke(ld_flags)
+        if i.return_val != 0:
+            self.handle_error(i.stdout)
 
         # Now, generate a stripped version
         link_path_split = os.path.split(link_path)
@@ -238,9 +238,9 @@ class gcc(compiler):
                        '-o' + self.prep_path(stripped_path),
                        self.prep_path(link_path)
                       ]
-        with self.invoke(strip_flags) as i:
-            if i.return_val != 0:
-                self.handle_error(i.stdout)
+        i = self.invoke(strip_flags)
+        if i.return_val != 0:
+            self.handle_error(i.stdout)
 
     def get_lib_name(self, name):
         return 'lib' + name + '.a'
@@ -321,9 +321,9 @@ class mingw_x86(gcc):
 
                 # Run it
                 self.print_both("resource compile %s" % source_split[1])
-                with self.invoke(invocation_flags) as i:
-                    if i.return_val != 0:
-                        self.handle_error(i.stdout)
+                i = self.invoke(invocation_flags)
+                if i.return_val != 0:
+                    self.handle_error(i.stdout)
 
                 rebuild_list.remove(r)
                 did_rc = True

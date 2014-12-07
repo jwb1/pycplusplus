@@ -5,7 +5,8 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{59cdb5eb-b0f2-4a16-9e7a-c5178f26f4e1}</ProjectGuid>
     <ProjectHome />
-    <StartupFile>compiler.py</StartupFile>
+    <StartupFile>
+    </StartupFile>
     <SearchPath />
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
@@ -23,11 +24,15 @@
   <ItemGroup>
     <Compile Include="compiler.py" />
     <Compile Include="gcc.py" />
+    <Compile Include="test\test.py" />
     <Compile Include="visualcpp.py" />
     <Compile Include="__init__.py" />
   </ItemGroup>
   <ItemGroup>
     <InterpreterReference Include="{2af0f10d-7135-4994-9156-5d01c9c11b7e}\2.7" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="test\" />
   </ItemGroup>
   <Import Project="$(PtvsTargetsFile)" Condition="Exists($(PtvsTargetsFile))" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="!Exists($(PtvsTargetsFile))" />

@@ -103,25 +103,33 @@ class visual_cpp(compiler):
 
     def detect(self):
         vs_common_tools_var = self.get_vs_common_tools_var()
+        if not vs_common_tools_var in os.environ:
+            self.print_console("error: Visual C++ can not be located ({0} is not set.)".format(vs_common_tools_var))
+            return False
+
         vs_common_tools = os.environ[vs_common_tools_var]
         if not os.path.isdir(vs_common_tools):
-            self.print_both("error: Viusal C++ can not be located (%1 is not set or not valid.)" % vs_common_tools_var)
+            self.print_console("error: Visual C++ can not be located ({0} is not valid.)".format(vs_common_tools_var))
             return False
 
         self.tool_dir = os.path.abspath(os.path.join(vs_common_tools, os.pardir, os.pardir, 'VC'))
         if not os.path.isdir(self.tool_dir):
-            self.print_both("error: Viusal C++ can not be located (VC directory not found.)")
+            self.print_console("error: Visual C++ can not be located (VC directory not found.)")
             return False
 
         self.builtin_include_list = []
+        self.builtin_libpath_list = []
 
-        # Add the MFC/ATL directory, if it's there.
-        self.mfcatl_dir = os.path.join(self.tool_dir, 'atlmfc')
-        if os.path.isdir(self.mfcatl_dir):
-            self.builtin_include_list.insert(0, os.path.join(self.mfcatl_dir, 'include'))
+        # Add Windows SDK stuff.
+        self.find_winsdk()
+        if not self.winsdk_dir or not os.path.isdir(self.winsdk_dir):
+            self.print_console("error: Windows SDK can not be located.")
+            return False
 
-        # Add the C standard library
-        self.builtin_include_list.insert(0, os.path.join(self.tool_dir, 'include'))
+        # Find the MFC/ATL directory, if it's there.
+        mfcatl_dir = os.path.join(self.tool_dir, 'atlmfc')
+        if os.path.isdir(mfcatl_dir):
+            self.mfcatl_dir = mfcatl_dir
 
         # Visual C++ needs to access dlls in this directory, so add it to the path.
         path = os.environ['PATH']
@@ -133,22 +141,68 @@ class visual_cpp(compiler):
         if 'VS_UNICODE_OUTPUT' in os.environ:
             del(os.environ['VS_UNICODE_OUTPUT'])
 
-        # Add Windows SDK stuff.
-        self.find_winsdk()
-        if not self.winsdk_dir or not os.path.isdir(self.winsdk_dir):
-            self.print_both("error: Windows SDK can not be located.")
-            return False
+        return True
+
+    def default_x86_tools(self):
+        self.cl   = os.path.join(self.tool_dir, 'bin', 'cl.exe')
+        self.link = os.path.join(self.tool_dir, 'bin', 'link.exe')
+        self.lib  = os.path.join(self.tool_dir, 'bin', 'lib.exe')
+
+        if self.mfcatl_dir:
+            self.builtin_include_list.append(os.path.join(self.mfcatl_dir, 'include'))
+            self.builtin_libpath_list.append(os.path.join(self.mfcatl_dir, 'lib'))
 
         if self.winsdk_new_layout:
             # Windows 8 and newer SDKs
             self.rc = os.path.join(self.winsdk_dir, 'bin', 'x86', 'rc.exe')
-            self.builtin_include_list.insert(0, os.path.join(self.winsdk_dir, 'include', 'shared'))
-            self.builtin_include_list.insert(0, os.path.join(self.winsdk_dir, 'include', 'um'))
+            self.builtin_include_list.append(os.path.join(self.winsdk_dir, 'Include', 'shared'))
+            self.builtin_include_list.append(os.path.join(self.winsdk_dir, 'Include', 'um'))
+            self.builtin_libpath_list.append(os.path.join(self.winsdk_dir, 'Lib', 'winv6.3', 'um', 'x86'))
         else:
             # Windows 7 and older SDKs
             self.rc = os.path.join(self.winsdk_dir, 'bin', 'rc.exe')
-            self.builtin_include_list.insert(os.path.join(self.winsdk_dir, 'include'))
+            self.builtin_include_list.append(os.path.join(self.winsdk_dir, 'include'))
+            self.builtin_libpath_list.append(os.path.join(self.winsdk_dir, 'lib'))
 
+        # Add the C standard library
+        self.builtin_include_list.append(os.path.join(self.tool_dir, 'include'))
+        self.builtin_libpath_list.append(os.path.join(self.tool_dir, 'lib'))
+        return True
+
+    def default_x64_tools(self):
+        host_proc = os.environ['PROCESSOR_ARCHITECTURE']
+        if host_proc != 'AMD64' and host_proc != 'x86':
+            self.print_both("error: Only x86 and x64 host processor architectures are supported for Visual C++.")
+            return False
+
+        if host_proc == 'AMD64':
+            self.cl   = os.path.join(self.tool_dir, 'bin', 'amd64', 'cl.exe')
+            self.link = os.path.join(self.tool_dir, 'bin', 'amd64', 'link.exe')
+            self.lib  = os.path.join(self.tool_dir, 'bin', 'amd64', 'lib.exe')
+        elif host_proc == 'x86':
+            self.cl   = os.path.join(self.tool_dir, 'bin', 'x86_amd64', 'cl.exe')
+            self.link = os.path.join(self.tool_dir, 'bin', 'x86_amd64', 'link.exe')
+            self.lib  = os.path.join(self.tool_dir, 'bin', 'x86_amd64', 'lib.exe')
+
+        if self.mfcatl_dir:
+            self.builtin_include_list.append(os.path.join(self.mfcatl_dir, 'include'))
+            self.builtin_libpath_list.append(os.path.join(self.mfcatl_dir, 'lib', 'amd64'))
+
+        if self.winsdk_new_layout:
+            # Windows 8 and newer SDKs
+            self.rc = os.path.join(self.winsdk_dir, 'bin', 'x86', 'rc.exe')
+            self.builtin_include_list.append(os.path.join(self.winsdk_dir, 'Include', 'shared'))
+            self.builtin_include_list.append(os.path.join(self.winsdk_dir, 'Include', 'um'))
+            self.builtin_libpath_list.append(os.path.join(self.winsdk_dir, 'Lib', 'winv6.3', 'um', 'x64'))
+        else:
+            # Windows 7 and older SDKs
+            self.rc = os.path.join(self.winsdk_dir, 'bin', 'rc.exe')
+            self.builtin_include_list.append(os.path.join(self.winsdk_dir, 'include'))
+            self.builtin_libpath_list.append(os.path.join(self.winsdk_dir, 'lib', 'x64'))
+
+        # Add the C standard library
+        self.builtin_include_list.append(os.path.join(self.tool_dir, 'include'))
+        self.builtin_libpath_list.append(os.path.join(self.tool_dir, 'lib', 'amd64'))
         return True
 
     def compile(self, name, config, output_dir, rebuild_list, include_list, define_list):
@@ -229,8 +283,8 @@ class visual_cpp(compiler):
 
                 # Run it
                 self.print_both("building precompiled header")
-                with self.invoke(invocation_flags) as i:
-                    self.handle_compiler_invoke_result(i, r.dep)
+                i = self.invoke(invocation_flags)
+                self.handle_compiler_invoke_result(i, r.dep)
 
                 # Do not compile the precompiled header source file again
                 rebuild_list.remove(r)
@@ -246,9 +300,9 @@ class visual_cpp(compiler):
 
                 # Run it
                 self.print_both("resource compile %s" % source_split[1])
-                with self.invoke(invocation_flags) as i:
-                    if i.return_val != 0:
-                        self.handle_error(i.stdout)
+                i = self.invoke(invocation_flags)
+                if i.return_val != 0:
+                    self.handle_error(i.stdout)
 
                 rebuild_list.remove(r)
                 did_rc = True
@@ -261,8 +315,8 @@ class visual_cpp(compiler):
 
             # Run it
             self.print_both("compiling %s" % os.path.basename(r.source))
-            with self.invoke(invocation_flags) as i:
-                self.handle_compiler_invoke_result(i, r.dep)
+            i = self.invoke(invocation_flags)
+            self.handle_compiler_invoke_result(i, r.dep)
 
     def handle_compiler_invoke_result(self, i, deps_file_name):
         # Visual C++ interleaves the header list we use for deps files into the normal output
@@ -311,9 +365,9 @@ class visual_cpp(compiler):
         lib_flags.append('/OUT:"' + lib_path + '"')
 
         self.print_both("linking %s" % lib_name)
-        with self.3(lib_flags) as i:
-            if i.return_val != 0:
-                self.handle_error(i.stdout)
+        i = self.invoke(lib_flags)
+        if i.return_val != 0:
+            self.handle_error(i.stdout)
 
     def link_module(self, name, output_dir, config, built_code, link_module_type, libpath_list, lib_list):
         link_name = self.get_link_name(name, link_module_type)
@@ -364,9 +418,9 @@ class visual_cpp(compiler):
             link_flags.extend(['libcpmt.lib', 'libcmt.lib'])
 
         self.print_both("linking %s" % link_name)
-        with self.invoke(link_flags) as i:
-            if i.return_val != 0:
-                self.handle_error(i.stdout)
+        i = self.invoke(link_flags)
+        if i.return_val != 0:
+            self.handle_error(i.stdout)
 
     def get_lib_name(self, name):
         return name + '.lib'
@@ -401,15 +455,7 @@ class visual_cpp_2008_x86(visual_cpp_2008):
         if not visual_cpp_2008.detect(self):
             return False
 
-        self.cl   = os.path.join(self.tool_dir, 'bin', 'cl.exe')
-        self.link = os.path.join(self.tool_dir, 'bin', 'link.exe')
-        self.lib  = os.path.join(self.tool_dir, 'bin', 'lib.exe')
-
-        self.builtin_libpath_list = [os.path.join(self.winsdk_dir, 'lib'),
-                                     os.path.join(self.tool_dir, 'lib')]
-        if self.mfcatl_dir:
-            self.builtin_libpath_list.insert(0, os.path.join(self.mfcatl_dir, 'lib'))
-        return True
+        return self.default_x86_tools()
 
     def target_compile_flags(self):
         return ['/arch:SSE2']
@@ -425,25 +471,7 @@ class visual_cpp_2008_x64(visual_cpp_2008):
         if not visual_cpp_2008.detect(self):
             return False
 
-        host_proc = os.environ['PROCESSOR_ARCHITECTURE']
-        if host_proc != 'AMD64' and host_proc != 'x86':
-            self.print_both("error: Only x86 and x64 host processor architectures are supported for Visual C++ 2008.")
-            return False
-
-        if host_proc == 'AMD64':
-            self.cl   = os.path.join(self.tool_dir, 'bin', 'amd64', 'cl.exe')
-            self.link = os.path.join(self.tool_dir, 'bin', 'amd64', 'link.exe')
-            self.lib  = os.path.join(self.tool_dir, 'bin', 'amd64', 'lib.exe')
-        elif host_proc == 'x86':
-            self.cl   = os.path.join(self.tool_dir, 'bin', 'x86_amd64', 'cl.exe')
-            self.link = os.path.join(self.tool_dir, 'bin', 'x86_amd64', 'link.exe')
-            self.lib  = os.path.join(self.tool_dir, 'bin', 'x86_amd64', 'lib.exe')
-
-        self.builtin_libpath_list = [os.path.join(self.winsdk_dir, 'lib', 'x64'),
-                                     os.path.join(self.tool_dir, 'lib', 'amd64')]
-        if self.mfcatl_dir:
-            self.builtin_libpath_list.insert(0, os.path.join(self.mfcatl_dir, 'lib', 'amd64'))
-        return True
+        return self.default_x64_tools()
 
     def target_compile_flags(self):
         return []
@@ -463,15 +491,7 @@ class visual_cpp_2010_x86(visual_cpp_2010):
         if not visual_cpp_2010.detect(self):
             return False
 
-        self.cl   = os.path.join(self.tool_dir, 'bin', 'cl.exe')
-        self.link = os.path.join(self.tool_dir, 'bin', 'link.exe')
-        self.lib  = os.path.join(self.tool_dir, 'bin', 'lib.exe')
-
-        self.builtin_libpath_list = [os.path.join(self.winsdk_dir, 'lib'),
-                                     os.path.join(self.tool_dir, 'lib')]
-        if self.mfcatl_dir:
-            self.builtin_libpath_list.insert(0, os.path.join(self.mfcatl_dir, 'lib'))
-        return True
+        return self.default_x86_tools()
 
     def target_compile_flags(self):
         return ['/arch:SSE2']
@@ -487,25 +507,7 @@ class visual_cpp_2010_x64(visual_cpp_2010):
         if not visual_cpp_2010.detect(self):
             return False
 
-        host_proc = os.environ['PROCESSOR_ARCHITECTURE']
-        if host_proc != 'AMD64' and host_proc != 'x86':
-            self.print_both("error: Only x86 and x64 host processor architectures are supported for Visual C++ 2010.")
-            return False
-
-        if host_proc == 'AMD64':
-            self.cl   = os.path.join(self.tool_dir, 'bin', 'amd64', 'cl.exe')
-            self.link = os.path.join(self.tool_dir, 'bin', 'amd64', 'link.exe')
-            self.lib  = os.path.join(self.tool_dir, 'bin', 'amd64', 'lib.exe')
-        elif host_proc == 'x86':
-            self.cl   = os.path.join(self.tool_dir, 'bin', 'x86_amd64', 'cl.exe')
-            self.link = os.path.join(self.tool_dir, 'bin', 'x86_amd64', 'link.exe')
-            self.lib  = os.path.join(self.tool_dir, 'bin', 'x86_amd64', 'lib.exe')
-
-        self.builtin_libpath_list = [os.path.join(self.winsdk_dir, 'lib', 'x64'),
-                                     os.path.join(self.tool_dir, 'lib', 'amd64')]
-        if self.mfcatl_dir:
-            self.builtin_libpath_list.insert(0, os.path.join(self.mfcatl_dir, 'lib', 'amd64'))
-        return True
+        return self.default_x64_tools()
 
     def target_compile_flags(self):
         return []
@@ -525,15 +527,7 @@ class visual_cpp_2013_x86(visual_cpp_2013):
         if not visual_cpp_2013.detect(self):
             return False
 
-        self.cl   = os.path.join(self.tool_dir, 'bin', 'cl.exe')
-        self.link = os.path.join(self.tool_dir, 'bin', 'link.exe')
-        self.lib  = os.path.join(self.tool_dir, 'bin', 'lib.exe')
-
-        self.builtin_libpath_list = [os.path.join(self.winsdk_dir, 'lib'),
-                                     os.path.join(self.tool_dir, 'lib')]
-        if self.mfcatl_dir:
-            self.builtin_libpath_list.insert(0, os.path.join(self.mfcatl_dir, 'lib'))
-        return True
+        return self.default_x86_tools()
 
     def target_compile_flags(self):
         return ['/arch:SSE2']
@@ -549,25 +543,7 @@ class visual_cpp_2013_x64(visual_cpp_2013):
         if not visual_cpp_2013.detect(self):
             return False
 
-        host_proc = os.environ['PROCESSOR_ARCHITECTURE']
-        if host_proc != 'AMD64' and host_proc != 'x86':
-            self.print_both("error: Only x86 and x64 host processor architectures are supported for Visual C++ 2013.")
-            return False
-
-        if host_proc == 'AMD64':
-            self.cl   = os.path.join(self.tool_dir, 'bin', 'amd64', 'cl.exe')
-            self.link = os.path.join(self.tool_dir, 'bin', 'amd64', 'link.exe')
-            self.lib  = os.path.join(self.tool_dir, 'bin', 'amd64', 'lib.exe')
-        elif host_proc == 'x86':
-            self.cl   = os.path.join(self.tool_dir, 'bin', 'x86_amd64', 'cl.exe')
-            self.link = os.path.join(self.tool_dir, 'bin', 'x86_amd64', 'link.exe')
-            self.lib  = os.path.join(self.tool_dir, 'bin', 'x86_amd64', 'lib.exe')
-
-        self.builtin_libpath_list = [os.path.join(self.winsdk_dir, 'lib', 'x64'),
-                                     os.path.join(self.tool_dir, 'lib', 'amd64')]
-        if self.mfcatl_dir:
-            self.builtin_libpath_list.insert(0, os.path.join(self.mfcatl_dir, 'lib', 'amd64'))
-        return True
+        return self.default_x64_tools()
 
     def target_compile_flags(self):
         return []

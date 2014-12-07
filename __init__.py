@@ -15,7 +15,6 @@
 
 __version__ = '0.0.1'
 __all__ = ['get_supported_compilers', 'get_compiler']
-
 __author__ = 'Joshua Buckman <josh@buckman.me>'
 
 import platform
