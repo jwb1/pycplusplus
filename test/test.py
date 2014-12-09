@@ -1,5 +1,5 @@
 #   Python C++ Compiler Invocation Library
-#   Copyright 2012-2014 Joshua Buckman
+#   Copyright 2014 Joshua Buckman
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ void main()
         else:
             print("Compiler not found")
 
-    #shutil.rmtree(test_dir)
+    shutil.rmtree(test_dir)
 
 if __name__ == "__main__":
     main()

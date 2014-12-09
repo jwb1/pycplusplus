@@ -1,5 +1,5 @@
 #   Python C++ Compiler Invocation Library
-#   Copyright 2012-2014 Joshua Buckman
+#   Copyright 2014 Joshua Buckman
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -131,11 +131,6 @@ class visual_cpp(compiler):
         if os.path.isdir(mfcatl_dir):
             self.mfcatl_dir = mfcatl_dir
 
-        # Visual C++ needs to access dlls in this directory, so add it to the path.
-        path = os.environ['PATH']
-        path += ';' + os.path.abspath(os.path.join(self.tool_dir, os.pardir, 'Common7', 'IDE'))
-        os.environ['PATH'] = path
-
         # Make sure to remove the magic environment variable to allow compiler
         # output to be redirected even from within the IDE.
         if 'VS_UNICODE_OUTPUT' in os.environ:
@@ -167,6 +162,16 @@ class visual_cpp(compiler):
         # Add the C standard library
         self.builtin_include_list.append(os.path.join(self.tool_dir, 'include'))
         self.builtin_libpath_list.append(os.path.join(self.tool_dir, 'lib'))
+
+        # Visual C++ needs to access dlls scattered through the installation, so add to the PATH.
+        path = os.environ['PATH']
+        if path[-1] != ';':
+            path += ';'
+        path += os.path.abspath(os.path.join(self.tool_dir, os.pardir, 'Common7', 'IDE'))
+        path += ';'
+        path += os.path.abspath(os.path.join(self.tool_dir, 'bin'))
+        os.environ['PATH'] = path
+
         return True
 
     def default_x64_tools(self):
@@ -203,6 +208,19 @@ class visual_cpp(compiler):
         # Add the C standard library
         self.builtin_include_list.append(os.path.join(self.tool_dir, 'include'))
         self.builtin_libpath_list.append(os.path.join(self.tool_dir, 'lib', 'amd64'))
+
+        # Visual C++ needs to access dlls scattered through the installation, so add to the PATH.
+        path = os.environ['PATH']
+        if path[-1] != ';':
+            path += ';'
+        path += os.path.abspath(os.path.join(self.tool_dir, os.pardir, 'Common7', 'IDE'))
+        path += ';'
+        if host_proc == 'AMD64':
+            path += os.path.abspath(os.path.join(self.tool_dir, 'bin', 'amd64'))
+        elif host_proc == 'x86':
+            path += os.path.abspath(os.path.join(self.tool_dir, 'bin'))
+        os.environ['PATH'] = path
+
         return True
 
     def compile(self, name, config, output_dir, rebuild_list, include_list, define_list):
